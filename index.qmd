@@ -323,7 +323,7 @@ The function runs as-is (so the notebook renders), but the satisficing plot will
 function satisficing(df, τ)
     combine(groupby(df, :elevation_ft)) do gdf
         costs = gdf.total_cost
-        frac = 0.0  # FIX ME: compute the fraction of costs below τ
+        frac = mean(costs .< τ)  # FIX ME: compute the fraction of costs below τ
         (fraction_satisfactory=frac,)
     end
 end
@@ -417,6 +417,8 @@ end
 *Do the three metrics agree on the best elevation height?
 If they disagree, explain intuitively why each metric favors a different choice.
 Which metric would you use if advising a homeowner? Why?*
+
+No. Expected cost favors the lowest elevation (0 ft) because it averages across all trajectories, and the low-cost trajectories dominate the average. Satisficing favors a moderate elevation (6 ft) because it maximizes the fraction of trajectories below the $150K threshold, which happens to occur at that height. Minimax regret favors a higher elevation (10 ft) because it minimizes the worst-case regret, which occurs in the most extreme trajectories where low elevations perform very poorly.
 :::
 
 
@@ -483,6 +485,8 @@ end
 *How much do the robustness metrics change when you drop RCP 8.5? When you drop DP16?
 What does this tell you about the relationship between "robustness" and the choice of scenario ensemble?
 Is it defensible to claim a decision is "robust" without specifying which futures were considered?*
+
+The Expected Cost does not change much, while Satisficing and Maximum Reget have differences. In general, it is not defensible to claim robustness absent a specification of which futures were considered, because the choice of scenarios can significantly affect the results. 
 :::
 
 
@@ -592,7 +596,7 @@ function weighted_expected_cost(df, weights)
     combine(groupby(df, :elevation_ft)) do gdf
         w = weights[gdf.trajectory]
         costs = gdf.total_cost
-        (expected_cost=mean(costs),)  # FIX ME: use weights instead of simple mean
+        (expected_cost=sum(costs .* w),)  # FIX ME: use weights instead of simple mean
     end
 end
 
@@ -600,7 +604,7 @@ function weighted_satisficing(df, weights, τ)
     combine(groupby(df, :elevation_ft)) do gdf
         w = weights[gdf.trajectory]
         costs = gdf.total_cost
-        (fraction_satisfactory=mean(costs .< τ),)  # FIX ME: use weights instead of simple mean
+        (fraction_satisfactory=sum(w .* (costs .< τ)),)  # FIX ME: use weights instead of simple mean
     end
 end
 ```
@@ -639,6 +643,8 @@ end
 *Compare the weighted results to the unweighted results from Act 1.
 How does the choice of prior change the recommended elevation?
 Does the weighting stabilize the results compared to the subset sensitivity in Act 2?*
+
+The choice of prior shifts the recommended elevation. The Slow SLR prior favors a lower elevation, while the Rapid SLR prior favors a higher elevation. No, weighting does not stabilize the results. 
 :::
 
 
@@ -648,8 +654,11 @@ Does the weighting stabilize the results compared to the subset sensitivity in A
 *You are advising a city council in Norfolk, VA on setting minimum elevation requirements for new construction.*
 
 1. *Which elevation height would you recommend, and which robustness metric would you use to justify your recommendation?*
+I would recommend an elevation of 6 ft, justified by the satisficing metric, which maximizes the fraction of trajectories below the $150K threshold.
 2. *A council member asks: "Is this robust?" How do you respond?*
+Yes, this choice performs well across multiple scenarios. 
 3. *What are the trade-offs between the three approaches (expected cost, satisficing, minimax regret)?*
+Expected cost is simple and intuitive but can be dominated by low-cost trajectories. Satisficing focuses on meeting a specific threshold, which can be more relevant for decision-makers but depends heavily on the choice of threshold. Minimax regret protects against worst-case outcomes but can be overly conservative if the worst cases are very extreme.
 :::
 
 
